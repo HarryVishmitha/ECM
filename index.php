@@ -1,6 +1,7 @@
 <?php
 // index.php
 require 'env.php';
+require_once 'core/DB_conn.php';
 $page = 'home';
 ?>
 <!DOCTYPE html>
@@ -242,7 +243,7 @@ $page = 'home';
 
 
 
-    Footer
+    <!-- Footer -->
     <?php include 'components/footer.php'; ?>
 
 

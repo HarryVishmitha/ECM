@@ -111,3 +111,36 @@ function openQuickView(title, price, image, description) {
 function closeQuickView() {
   document.getElementById("quickViewModal").style.display = "none";
 }
+
+function openSizeGuide(event) {
+  event.preventDefault();
+  const modal = document.getElementById("prodSizeGuideModal");
+  if (modal) modal.classList.add("active");
+}
+
+function closeSizeGuide() {
+  const modal = document.getElementById("prodSizeGuideModal");
+  if (modal) modal.classList.remove("active");
+}
+
+function adjustQty(delta) {
+  const input = document.getElementById("qty");
+  let value = parseInt(input.value);
+  if (!isNaN(value)) {
+    input.value = Math.max(1, value + delta);
+  }
+}
+
+function closeSizeGuide() {
+  const modal = document.getElementById("prodSizeGuideModal");
+  modal.classList.remove("active");
+  if (window.innerWidth < 768) {
+    document.querySelector(".prod-form").scrollIntoView({ behavior: "smooth" });
+  }
+}
+
+function changeMainImage(thumb) {
+    const mainImage = document.getElementById('mainProductImage');
+    mainImage.src = thumb.src;
+    mainImage.alt = thumb.alt;
+}

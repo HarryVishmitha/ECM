@@ -118,14 +118,14 @@ $page = 'products';
                 <div class="product-grid">
                     <?php
                     $products = [
-                        ["title" => "Boho Blouse", "price" => "Rs. 2,700", "img" => "category-women.jpg", "description" => "A breathable bohemian blouse perfect for sunny days."],
-                        ["title" => "Slim Fit Shirt", "price" => "Rs. 3,950", "img" => "category-men.jpg", "description" => "A stylish slim fit shirt for a modern look."],
-                        ["title" => "Leather Wallet", "price" => "Rs. 1,500", "img" => "category-accessories.jpeg", "description" => "A classic leather wallet with multiple card slots."],
-                        ["title" => "Summer Dress", "price" => "Rs. 4,200", "img" => "category-seasonal.jpg", "description" => "A light and airy summer dress for casual outings."],
-                        ["title" => "Knitted Sweater", "price" => "Rs. 5,200", "img" => "category-seasonal.jpg", "description" => "A breathable bohemian blouse perfect for sunny days."],
-                        ["title" => "Crossbody Bag", "price" => "Rs. 3,000", "img" => "category-accessories.jpeg", "description" => "A breathable bohemian blouse perfect for sunny days."],
-                        ["title" => "Floral Skirt", "price" => "Rs. 2,450", "img" => "category-women.jpg", "description" => "A breathable bohemian blouse perfect for sunny days."],
-                        ["title" => "Denim Jacket", "price" => "Rs. 6,000", "img" => "category-men.jpg", "description" => "A breathable bohemian blouse perfect for sunny days."],
+                        ["id" => "1", "slug" => "boho-blouse","title" => "Boho Blouse", "price" => "Rs. 2,700", "img" => "category-women.jpg", "description" => "A breathable bohemian blouse perfect for sunny days."],
+                        ["id" => "1", "slug" => "boho-blouse","title" => "Slim Fit Shirt", "price" => "Rs. 3,950", "img" => "category-men.jpg", "description" => "A stylish slim fit shirt for a modern look."],
+                        ["id" => "1", "slug" => "boho-blouse","title" => "Leather Wallet", "price" => "Rs. 1,500", "img" => "category-accessories.jpeg", "description" => "A classic leather wallet with multiple card slots."],
+                        ["id" => "1", "slug" => "boho-blouse","title" => "Summer Dress", "price" => "Rs. 4,200", "img" => "category-seasonal.jpg", "description" => "A light and airy summer dress for casual outings."],
+                        ["id" => "1", "slug" => "boho-blouse","title" => "Knitted Sweater", "price" => "Rs. 5,200", "img" => "category-seasonal.jpg", "description" => "A breathable bohemian blouse perfect for sunny days."],
+                        ["id" => "1", "slug" => "boho-blouse","title" => "Crossbody Bag", "price" => "Rs. 3,000", "img" => "category-accessories.jpeg", "description" => "A breathable bohemian blouse perfect for sunny days."],
+                        ["id" => "1", "slug" => "boho-blouse","title" => "Floral Skirt", "price" => "Rs. 2,450", "img" => "category-women.jpg", "description" => "A breathable bohemian blouse perfect for sunny days."],
+                        ["id" => "1", "slug" => "boho-blouse","title" => "Denim Jacket", "price" => "Rs. 6,000", "img" => "category-men.jpg", "description" => "A breathable bohemian blouse perfect for sunny days."],
                     ];
                     foreach ($products as $p) {
                         // Escape quotes for safety
@@ -142,7 +142,7 @@ $page = 'products';
                                 <div class="product-info">
                                     <h3>' . $title . '</h3>
                                     <p class="price">' . $price . '</p>
-                                    <a href="#" class="btn small-btn primary-btn text-decoration-none view-details">View Details</a>
+                                    <a href="product-details.php?id=' . $p["id"] . '&slug='. $p["slug"] .'" class="btn small-btn primary-btn text-decoration-none view-details">View Details</a>
                                     <button class="quick-view-btn" onclick="openQuickView(\'' . $title . '\', \'' . $price . '\', \'' . $img . '\', \'' . $desc . '\')">
                                         👁 Quick View
                                     </button>
