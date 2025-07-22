@@ -33,9 +33,15 @@
                         <li class="top-nav-links <?= ($page === 'contact') ? 'nav-active' : '' ?>">
                             <a href="contact.php?page=contact" class="nav-link">Contact Us</a>
                         </li>
+                        <li class="top-nav-links <?= ($page === 'cart') ? 'nav-active' : '' ?>">
+                            <a href="customer/cart.php" class="nav-icon" title="Cart">
+                                <img src="inc/assets/icons/cart.svg" alt="Cart" />
+                            </a>
+                        </li>
                         <li class="top-nav-links <?= ($page === 'login') ? 'nav-active' : '' ?>">
                             <a href="login.php?page=login" class="nav-link">Login</a>
                         </li>
+
                     </ul>
                 </nav>
             </div>

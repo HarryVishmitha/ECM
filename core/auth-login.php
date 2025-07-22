@@ -43,7 +43,7 @@ try {
                 if ($role === 'admin') {
                     $redirectURL = '../admin/dashboard.php';
                 } else {
-                    $redirectURL = '../user/dashboard.php';
+                    $redirectURL = '../customer/dashboard.php';
                 }
 
                 $alert = ['type' => 'success', 'msg' => "Login successful! Redirecting to your $role dashboard..."];

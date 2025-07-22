@@ -2,7 +2,7 @@
      <div class="container footer-content">
          <div class="footer-brand">
              <div class="align-items-center d-flex flex-column">
-                 <img src="inc/assets/site-images/logo.png" alt="Velvet Vogue Logo" class="logo-icon" />
+                 <img src="/ecm/inc/assets/site-images/logo.png" alt="Velvet Vogue Logo" class="logo-icon" />
                  <div class="logo-text">
                      <span class="brand-name text-white">Velvet Vogue</span>
                      <span class="brand-tagline text-white">Clothing</span>
