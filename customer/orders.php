@@ -28,6 +28,72 @@ mysqli_stmt_close($stmt);
     <link rel="stylesheet" href="../inc/css/customer-stylesheet.css">
     <script src="../inc/js/customer-script.js" defer></script>
     <link rel="icon" href="../inc/assets/site-images/logo.png" type="image/x-icon">
+    <style>
+        body {
+            background-color: #f5f7fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        h1.text-center {
+            color: #333;
+            font-size: 2rem;
+            font-weight: 600;
+        }
+
+        .order-table {
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.05);
+        }
+
+        .order-table table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: #fff;
+        }
+
+        .order-table thead {
+            background-color: #5d3fd3;
+            color: #fff;
+        }
+
+        .order-table th,
+        .order-table td {
+            padding: 1rem;
+            text-align: center;
+            font-size: 0.95rem;
+            border-bottom: 1px solid #eee;
+        }
+
+        .order-table tr:hover {
+            background-color: #f2f4ff;
+        }
+
+        .order-table td:nth-child(3) {
+            text-transform: capitalize;
+            font-weight: 500;
+        }
+
+        .primary-btn.small-btn {
+            padding: 0.4rem 1rem;
+            font-size: 0.85rem;
+            border-radius: 6px;
+        }
+
+        .bg-white.text-center.p-4.border-rounded {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        .footer {
+            margin-top: 4rem;
+        }
+
+        .container.mt-5 {
+            padding-bottom: 2rem;
+        }
+    </style>
 </head>
 
 <body>

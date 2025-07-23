@@ -1,5 +1,5 @@
 <?php
-
+//customer/cart.php
 require '../env.php';
 require_once '../core/DB_conn.php';
 $page = 'cart';
@@ -68,6 +68,13 @@ WHERE c.user_id = ?
 
         <div class="container mt-3">
             <h1 class="mb-3 text-center">🛍️ Your Shopping Cart</h1>
+            <?php if (!empty($_SESSION['cart_message'])): ?>
+                <p class="alert alert-success">
+                    <?= htmlspecialchars($_SESSION['cart_message']) ?>
+                </p>
+            <?php
+                unset($_SESSION['cart_message']);
+            endif; ?>
 
             <?php if (empty($cartItems)): ?>
                 <p class="bg-white text-center p-4 border-rounded">Your cart is empty. <a href="../index.php?page=shop" class="primary-btn small-btn">Browse Products</a></p>
@@ -92,7 +99,13 @@ WHERE c.user_id = ?
                                         <input type="number" name="quantity" min="1" value="<?= $item['quantity'] ?>" />
                                         <button type="submit" class="primary-btn small-btn">Update</button>
                                     </form>
-                                    <a href="remove-cart.php?id=<?= $item['cart_id'] ?>" class="secondary-btn small-btn">Remove</a>
+
+                                    <!-- remove link -->
+                                    <a href="remove-cart.php?id=<?= $item['cart_id'] ?>"
+                                        class="secondary-btn small-btn"
+                                        onclick="return confirm('Remove this item from your cart?');">
+                                        Remove
+                                    </a>
                                 </div>
                             </div>
                         </div>

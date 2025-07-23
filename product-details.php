@@ -1,29 +1,46 @@
 <?php
 require 'env.php';
+require_once 'core/DB_conn.php';
 $page = 'product';
 
-// Simulate product DB
-$products = [
-    1 => [
-        "title" => "Boho Blouse",
-        "price" => "Rs. 2,700",
-        "images" => ["category-women.jpg", "category-men.jpg", "boho3.jpg"],
-        "description" => "A breathable bohemian blouse perfect for sunny days.",
-        "sizes" => ["S", "M", "L", "XL"]
-    ],
-    2 => [
-        "title" => "Men's Slim Fit Shirt",
-        "price" => "Rs. 3,950",
-        "images" => ["shirt1.jpg", "shirt2.jpg"],
-        "description" => "A sharp, modern fit shirt for all-day comfort.",
-        "sizes" => ["M", "L", "XL"]
-    ],
-];
+$id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+
+// Get main product
+$productQuery = mysqli_query($conn, "SELECT * FROM products WHERE id = $id AND status = 'active'");
+$product = mysqli_fetch_assoc($productQuery);
+
+// If product exists, fetch variants and images
+if ($product) {
+    // Fetch variants
+    // $variantQuery = mysqli_query($conn, "SELECT DISTINCT size FROM product_variants WHERE product_id = $id");
+    $variants = [];
+    $variantQuery = mysqli_query($conn, "SELECT * FROM product_variants WHERE product_id = $id");
+    while ($row = mysqli_fetch_assoc($variantQuery)) {
+        $variants[] = $row; // id, size, color, stock, additional_price
+    }
 
 
-// Get ID from query
-$id = isset($_GET['id']) ? (int)$_GET['id'] : 1;
-$product = $products[$id] ?? null;
+    // Fetch images
+    $imageQuery = mysqli_query($conn, "SELECT image_path FROM product_images WHERE product_id = $id");
+    $images = [];
+    while ($img = mysqli_fetch_assoc($imageQuery)) {
+        $images[] = $img['image_path'];
+    }
+} else {
+    $sizes = [];
+    $images = [];
+}
+
+
+$newProducts = "SELECT p.id, p.name, p.price, pi.image_path
+          FROM products p
+          LEFT JOIN product_images pi ON p.id = pi.product_id AND pi.is_primary = 1
+          WHERE p.status = 'active'
+          ORDER BY p.created_at DESC
+          LIMIT 4";
+
+$newArrivals = mysqli_query($conn, $newProducts);
+
 ?>
 
 <!DOCTYPE html>
@@ -32,10 +49,78 @@ $product = $products[$id] ?? null;
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo $product['title']; ?> – <?php echo $name; ?></title>
+    <title><?= $product['name'] ?? 'Product Not Found' ?> – <?= $name ?></title>
     <link rel="stylesheet" href="inc/css/stylesheet.css">
-    <script src="inc/js/script.js" defer></script>
+    <script src="inc/js/script.js"></script>
     <link rel="icon" href="inc/assets/site-images/logo.png" type="image/x-icon">
+
+    <script>
+        // Make updateColors and updatePrice available globally before DOMContentLoaded
+        const productVariants = <?= json_encode($variants) ?>;
+        let priceText, stockText, variantIdInput, submitBtn;
+
+        function updateColors() {
+            // Ensure elements are available
+            priceText = document.getElementById('priceText');
+            stockText = document.getElementById('stockText');
+            variantIdInput = document.getElementById('variantId');
+            submitBtn = document.querySelector('.add-to-cart-btn');
+
+            if (!priceText || !stockText || !variantIdInput) return;
+
+            // reset
+            priceText.textContent = "Rs. <?= number_format($product['price'], 2) ?>";
+            stockText.textContent = "";
+            variantIdInput.value = "";
+            if (submitBtn) submitBtn.disabled = true;
+
+            // populate colors
+            const size = document.getElementById('sizeSelect').value;
+            const colors = [...new Set(
+                productVariants
+                .filter(v => v.size === size)
+                .map(v => v.color)
+            )];
+
+            const colorSelect = document.getElementById('colorSelect');
+            colorSelect.innerHTML = '<option value="">-- Choose Color --</option>';
+            colors.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c;
+                opt.text = c;
+                colorSelect.appendChild(opt);
+            });
+        }
+
+        function updatePrice() {
+            // Ensure elements are available
+            priceText = document.getElementById('priceText');
+            stockText = document.getElementById('stockText');
+            variantIdInput = document.getElementById('variantId');
+            submitBtn = document.querySelector('.add-to-cart-btn');
+
+            if (!priceText || !stockText || !variantIdInput) return;
+
+            const size = document.getElementById('sizeSelect').value;
+            const color = document.getElementById('colorSelect').value;
+            const base = <?= $product['price'] ?>;
+            const match = productVariants.find(v => v.size === size && v.color === color);
+
+            if (match) {
+                const final = base + parseFloat(match.additional_price);
+                priceText.textContent = "Rs. " + final.toFixed(2);
+                stockText.textContent = "Stock: " + match.stock;
+                variantIdInput.value = match.id;
+                if (submitBtn) submitBtn.disabled = false;
+            } else {
+                priceText.textContent = "Rs. <?= number_format($product['price'], 2) ?>";
+                stockText.textContent = "Out of stock";
+                variantIdInput.value = "";
+                if (submitBtn) submitBtn.disabled = true;
+            }
+        }
+    </script>
+
 </head>
 
 <body>
@@ -44,10 +129,15 @@ $product = $products[$id] ?? null;
     <section class="product-header-section">
         <div class="container">
             <div class="breadcrumb">
-                <a href="index.php">Home</a> &gt; <a href="products.php?page=products">Products</a> &gt; <span><?php echo $product['title']; ?></span>
+                <a href="index.php">Home</a> &gt; <a href="products.php?page=products">Products</a> &gt; <span><?= htmlspecialchars($product['name']) ?></span>
             </div>
-            <h1 class="product-page-title"><?php echo $product['title']; ?></h1>
-            <p class="product-page-subtitle">View more details of <?php echo $product['title']; ?></p>
+            <h1 class="product-page-title"><?= htmlspecialchars($product['name']) ?></h1>
+            <p class="product-page-subtitle">View more details of <?= htmlspecialchars($product['name']) ?></p>
+            <?php if (isset($_SESSION['error'])): ?>
+                <p class="alert alert-error"><?= $_SESSION['error'];
+                                                unset($_SESSION['error']); ?></p>
+            <?php endif; ?>
+
         </div>
     </section>
 
@@ -56,20 +146,23 @@ $product = $products[$id] ?? null;
             <div class="container prod-grid">
                 <div class="prod-image-box">
                     <div class="main-image">
-                        <img id="mainProductImage" src="inc/assets/site-images/<?php echo $product['images'][0]; ?>" alt="<?php echo $product['title']; ?>">
+                        <img id="mainProductImage" src="<?= $images[0] ? str_replace('../', '', $images[0]) : 'fallback.jpg' ?>" alt="<?= htmlspecialchars($product['name']) ?>">
                     </div>
                     <div class="thumbnail-gallery">
-                        <?php foreach ($product['images'] as $index => $img): ?>
-                            <img src="inc/assets/site-images/<?php echo $img; ?>" alt="thumb-<?php echo $index; ?>" class="thumbnail" onclick="changeMainImage(this)">
+                        <?php foreach ($images as $index => $img): ?>
+                            <img src="<?= str_replace('../', '', $img) ?>" alt="thumb-<?= $index ?>" class="thumbnail" onclick="changeMainImage(this)">
                         <?php endforeach; ?>
+
                     </div>
                 </div>
 
                 <div class="prod-content-box">
-                    <h1 class="prod-title-main"><?php echo $product['title']; ?></h1>
+                    <h1 class="prod-title-main"><?= htmlspecialchars($product['name']) ?></h1>
                     <span class="stock-badge">In Stock</span>
-                    <p class="prod-price"><?php echo $product['price']; ?></p>
-                    <p class="prod-description"><?php echo $product['description']; ?></p>
+                    <p id="priceText" class="prod-price">Rs. <?= number_format($product['price'], 2) ?></p>
+                    <p id="stockText" class="stock-info"></p>
+
+                    <p class="prod-description"><?= nl2br(htmlspecialchars($product['description'])) ?></p>
 
                     <ul class="prod-features">
                         <li>🚚 Free delivery within 3–5 days</li>
@@ -77,24 +170,39 @@ $product = $products[$id] ?? null;
                         <li>🧼 Machine washable | Cool iron</li>
                     </ul>
 
-                    <form class="prod-form" action="#" method="post">
+                    <form class="prod-form" action="add_to_cart.php" method="post">
+                        <!-- <div class="prod-row"> -->
+                        <input type="hidden" name="product_id" value="<?= $product['id'] ?>">
+                        <input type="hidden" name="variant_id" id="variantId">
                         <div class="prod-row">
-                            <label for="size">
-                                Select Size:
-                                <a href="#" onclick="openSizeGuide(event)" class="size-guide-link">(Size Guide)</a>
-                            </label>
-                            <select id="size" name="size">
-                                <?php foreach ($product['sizes'] as $size): ?>
-                                    <option value="<?php echo $size; ?>"><?php echo $size; ?></option>
+                            <label>Select Size:</label>
+                            <select id="sizeSelect" name="size" onchange="updateColors()">
+                                <option value="">-- Choose Size --</option>
+                                <?php
+                                $uniqueSizes = array_unique(array_column($variants, 'size'));
+                                foreach ($uniqueSizes as $size):
+                                ?>
+                                    <option value="<?= $size ?>"><?= $size ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
 
                         <div class="prod-row">
+                            <label>Select Color:</label>
+                            <select id="colorSelect" name="color" onchange="updatePrice()">
+                                <option value="">-- Choose Color --</option>
+                                <!-- Colors will be populated via JS -->
+                            </select>
+                        </div>
+
+
+                        <!-- </div> -->
+
+                        <div class="prod-row">
                             <label for="qty">Quantity:</label>
                             <div class="qty-group">
                                 <button type="button" onclick="adjustQty(-1)">−</button>
-                                <input type="number" id="qty" name="qty" min="1" value="1" />
+                                <input type="number" id="qty" name="quantity" min="1" value="1" />
                                 <button type="button" onclick="adjustQty(1)">+</button>
                             </div>
                         </div>
@@ -151,40 +259,19 @@ $product = $products[$id] ?? null;
             <div class="container">
                 <h2>Related Products</h2>
                 <div class="product-grid">
-                    <?php
-                    $products = [
-                        ["id" => "1", "slug" => "boho-blouse", "title" => "Boho Blouse", "price" => "Rs. 2,700", "img" => "category-women.jpg", "description" => "A breathable bohemian blouse perfect for sunny days."],
-                        ["id" => "1", "slug" => "boho-blouse", "title" => "Slim Fit Shirt", "price" => "Rs. 3,950", "img" => "category-men.jpg", "description" => "A stylish slim fit shirt for a modern look."],
-                        ["id" => "1", "slug" => "boho-blouse", "title" => "Leather Wallet", "price" => "Rs. 1,500", "img" => "category-accessories.jpeg", "description" => "A classic leather wallet with multiple card slots."],
-                        ["id" => "1", "slug" => "boho-blouse", "title" => "Summer Dress", "price" => "Rs. 4,200", "img" => "category-seasonal.jpg", "description" => "A light and airy summer dress for casual outings."],
-                        ["id" => "1", "slug" => "boho-blouse", "title" => "Knitted Sweater", "price" => "Rs. 5,200", "img" => "category-seasonal.jpg", "description" => "A breathable bohemian blouse perfect for sunny days."],
-                        ["id" => "1", "slug" => "boho-blouse", "title" => "Crossbody Bag", "price" => "Rs. 3,000", "img" => "category-accessories.jpeg", "description" => "A breathable bohemian blouse perfect for sunny days."],
-                        ["id" => "1", "slug" => "boho-blouse", "title" => "Floral Skirt", "price" => "Rs. 2,450", "img" => "category-women.jpg", "description" => "A breathable bohemian blouse perfect for sunny days."],
-                        ["id" => "1", "slug" => "boho-blouse", "title" => "Denim Jacket", "price" => "Rs. 6,000", "img" => "category-men.jpg", "description" => "A breathable bohemian blouse perfect for sunny days."],
-                    ];
-                    foreach ($products as $p) {
-                        // Escape quotes for safety
-                        $title = htmlspecialchars($p["title"], ENT_QUOTES);
-                        $price = htmlspecialchars($p["price"], ENT_QUOTES);
-                        $img = 'inc/assets/site-images/' . $p["img"];
-                        $desc = isset($p["description"]) ? htmlspecialchars($p["description"], ENT_QUOTES) : 'No description available.';
 
-                        echo '
-                            <div class="product-card">
-                                <div class="product-image">
-                                    <img src="' . $img . '" alt="' . $title . '">
-                                </div>
-                                <div class="product-info">
-                                    <h3>' . $title . '</h3>
-                                    <p class="price">' . $price . '</p>
-                                    <a href="product-details.php?id=' . $p["id"] . '&slug=' . $p["slug"] . '" class="btn small-btn primary-btn text-decoration-none view-details">View Details</a>
-                                    <button class="quick-view-btn" onclick="openQuickView(\'' . $title . '\', \'' . $price . '\', \'' . $img . '\', \'' . $desc . '\')">
-                                        👁 Quick View
-                                    </button>
-                                </div>
-                            </div>';
-                    }
-                    ?>
+                    <?php while ($product = mysqli_fetch_assoc($newArrivals)): ?>
+                        <div class="product-card">
+                            <div class="product-image">
+                                <img src="<?= htmlspecialchars(str_replace('../', '', $product['image_path'])) ?>" alt="<?= htmlspecialchars($product['name']) ?>">
+                            </div>
+                            <div class="product-info">
+                                <h3><?= htmlspecialchars($product['name']) ?></h3>
+                                <p class="price">Rs. <?= number_format($product['price'], 2) ?></p>
+                                <a href="product-details.php?id=<?= $product['id'] ?>" class="btn small-btn primary-btn text-decoration-none">View Details</a>
+                            </div>
+                        </div>
+                    <?php endwhile; ?>
                 </div>
             </div>
         </section>
@@ -232,6 +319,8 @@ $product = $products[$id] ?? null;
 
     <?php include 'components/footer.php'; ?>
     <script>
+       
+
         document.addEventListener("DOMContentLoaded", () => {
             const toggles = document.querySelectorAll(".accordion-toggle");
 
@@ -255,6 +344,12 @@ $product = $products[$id] ?? null;
                     }
                 });
             });
+
+            const sizeSel = document.getElementById('sizeSelect');
+            const colorSel = document.getElementById('colorSelect');
+
+            if (sizeSel) sizeSel.addEventListener('change', updateColors);
+            if (colorSel) colorSel.addEventListener('change', updatePrice);
         });
     </script>
 </body>

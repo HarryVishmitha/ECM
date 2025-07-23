@@ -23,3 +23,4 @@ function openModal(id = "", name = "", status = "active") {
 function closeModal() {
   document.getElementById("categoryModal").classList.remove("show");
 }
+

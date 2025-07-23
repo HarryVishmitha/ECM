@@ -6,6 +6,22 @@ $page = 'Products - Admin';
 session_start();
 $userName = $_SESSION['user_name'];
 
+// Handle Delete
+if (isset($_GET['delete'])) {
+    $deleteId = (int) $_GET['delete'];
+
+    // Delete related records
+    mysqli_query($conn, "DELETE FROM product_images WHERE product_id = $deleteId");
+    mysqli_query($conn, "DELETE FROM product_variants WHERE product_id = $deleteId");
+    mysqli_query($conn, "DELETE FROM look_product WHERE product_id = $deleteId");
+
+    // Delete the product
+    mysqli_query($conn, "DELETE FROM products WHERE id = $deleteId");
+
+    header("Location: products.php?deleted=1");
+    exit;
+}
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -27,8 +43,11 @@ $userName = $_SESSION['user_name'];
 
         <main class="admin-main">
             <div class="dashboard-wrapper">
-                <h1 class="admin-title">Products</h1>
 
+                <h1 class="admin-title">Products</h1>
+                <?php if (isset($_GET['deleted'])): ?>
+                    <p class="alert alert-success">Product deleted successfully.</p>
+                <?php endif; ?>
                 <a href="add_product.php" class="btn btn-primary">+ Add New Product</a>
 
                 <div class="table-wrapper">
@@ -64,9 +83,9 @@ $userName = $_SESSION['user_name'];
                                     <td>Rs. <?= number_format($row['price'], 2) ?></td>
                                     <td><?= $row['total_stock'] ?? 0 ?></td>
                                     <td>
-                                        <a href="view_product.php?id=<?= $row['id'] ?>" class="btn btn-sm">View</a>
-                                        <a href="edit_product.php?id=<?= $row['id'] ?>" class="btn btn-sm">Edit</a>
-                                        <a href="delete_product.php?id=<?= $row['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this product?');">Delete</a>
+                                        <a href="add_product.php?id=<?= $row['id'] ?>" class="btn btn-sm">Edit/View</a>
+                                        <a href="products.php?delete=<?= $row['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this product?');">Delete</a>
+
                                     </td>
                                 </tr>
                             <?php endwhile; ?>

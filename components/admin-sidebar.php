@@ -7,6 +7,7 @@
             <li><a href="dashboard.php">🏠 Home</a></li>
             <li><a href="products.php">🛍️ Products</a></li>
             <li><a href="categories.php">📂 Categories</a></li>
+            <li><a href="looks.php">👗 Shop By Look</a></li>
             <li><a href="orders.php">📦 Orders</a></li>
             <li><a href="customers.php">👥 Customers</a></li>
             <li><a href="../components/profile_edit.php">⚙️ Profile</a></li>

@@ -1,5 +1,18 @@
 <?php
 // components/topnav.php
+// require_once '../core/DB_conn.php';
+// session_start();
+
+
+$cartCount = 0;
+
+if (isset($_SESSION['user_id'])) {
+    $userId = $_SESSION['user_id'];
+    $countQuery = "SELECT SUM(quantity) AS total FROM cart_items WHERE user_id = $userId";
+    $countResult = mysqli_query($conn, $countQuery);
+    $countRow = mysqli_fetch_assoc($countResult);
+    $cartCount = $countRow['total'] ?? 0;
+}
 ?>
 <div class="nav-overlay"></div>
 <div class="top-nav">
@@ -33,13 +46,16 @@
                         <li class="top-nav-links <?= ($page === 'contact') ? 'nav-active' : '' ?>">
                             <a href="contact.php?page=contact" class="nav-link">Contact Us</a>
                         </li>
-                        <li class="top-nav-links <?= ($page === 'cart') ? 'nav-active' : '' ?>">
+                        <li class="top-nav-links cart-link <?= ($page === 'cart') ? 'nav-active' : '' ?>">
                             <a href="customer/cart.php" class="nav-icon" title="Cart">
                                 <img src="inc/assets/icons/cart.svg" alt="Cart" />
+                                <?php if ($cartCount > 0): ?>
+                                    <span class="cart-badge"><?= $cartCount ?></span>
+                                <?php endif; ?>
                             </a>
                         </li>
                         <li class="top-nav-links <?= ($page === 'login') ? 'nav-active' : '' ?>">
-                            <a href="login.php?page=login" class="nav-link">Login</a>
+                            <a href="login.php?page=login" class="nav-link"><?php if(isset($_SESSION['user_id'])) { echo 'Dashboard'; } else { echo 'Login'; } ?></a>
                         </li>
 
                     </ul>

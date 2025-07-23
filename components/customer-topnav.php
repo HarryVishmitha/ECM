@@ -7,6 +7,16 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+$cartCount = 0;
+
+if (isset($_SESSION['user_id'])) {
+    $userId = $_SESSION['user_id'];
+    $countQuery = "SELECT SUM(quantity) AS total FROM cart_items WHERE user_id = $userId";
+    $countResult = mysqli_query($conn, $countQuery);
+    $countRow = mysqli_fetch_assoc($countResult);
+    $cartCount = $countRow['total'] ?? 0;
+}
+
 ?>
 
 <nav class="user-dashboard-topnav">
@@ -29,8 +39,10 @@ if (!isset($_SESSION['user_id'])) {
     <div class="user-nav-right" id="userNavMenu">
         <a href="orders.php" class="nav-link">Orders</a>
         <a href="wishlist.php" class="nav-link">Wishlist</a>
-        <a href="cart.php" class="nav-icon" title="Cart">
+        <a href="cart.php" class="nav-icon cart-link" title="Cart">
             <img src="../inc/assets/icons/cart.svg" alt="Cart" />
+            <span class="cart-badge"><?= $cartCount ?></span>
+
         </a>
         <div class="user-dropdown">
             <span class="dropdown-toggle"><?= htmlspecialchars($name) ?> ▼</span>

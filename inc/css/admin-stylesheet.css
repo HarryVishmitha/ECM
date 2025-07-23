@@ -440,3 +440,11 @@ button:hover,
 .gender-badge.other {
   background-color: #9e9e9e;
 }
+
+.mt-5 {
+  margin-top: 5rem;
+}
+
+.mt-3 {
+  margin-top: 3rem;
+}

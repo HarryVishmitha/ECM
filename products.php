@@ -1,7 +1,83 @@
 <?php
 // index.php
 require 'env.php';
+require_once 'core/DB_conn.php';
+
 $page = 'products';
+
+$category = isset($_GET['category']) ? trim($_GET['category']) : null;
+$lookId   = isset($_GET['look']) ? (int) $_GET['look'] : null;
+$sort     = isset($_GET['sort']) ? $_GET['sort'] : 'newest';
+
+$where = "WHERE p.status = 'active'";
+$params = [];
+
+if ($category) {
+    $where .= " AND c.name = ?";
+    $params[] = $category;
+}
+
+if ($lookId) {
+    $where .= " AND p.id IN (SELECT product_id FROM look_products WHERE look_id = ?)";
+    $params[] = $lookId;
+}
+
+switch ($sort) {
+    case 'low-to-high':
+        $orderBy = "ORDER BY p.price ASC";
+        break;
+    case 'high-to-low':
+        $orderBy = "ORDER BY p.price DESC";
+        break;
+    default:
+        $orderBy = "ORDER BY p.created_at DESC";
+        break;
+}
+
+$priceRange = isset($_GET['price']) ? $_GET['price'] : null;
+if ($priceRange) {
+    switch ($priceRange) {
+        case 'under-2000':
+            $where .= " AND p.price < 2000";
+            break;
+        case '2000-5000':
+            $where .= " AND p.price BETWEEN 2000 AND 5000";
+            break;
+        case 'above-5000':
+            $where .= " AND p.price > 5000";
+            break;
+    }
+}
+
+
+
+$sql = "SELECT 
+            p.*, 
+            c.name AS category_name,
+            (SELECT image_path FROM product_images WHERE product_id = p.id AND is_primary = 1 LIMIT 1) AS main_image
+        FROM products p
+        LEFT JOIN categories c ON p.category_id = c.id
+        $where
+        $orderBy";
+
+$stmt = mysqli_prepare($conn, $sql);
+
+// Bind parameters dynamically
+if (!empty($params)) {
+    $types = str_repeat("s", count($params));
+    mysqli_stmt_bind_param($stmt, $types, ...$params);
+}
+
+mysqli_stmt_execute($stmt);
+$result = mysqli_stmt_get_result($stmt);
+$products = mysqli_fetch_all($result, MYSQLI_ASSOC);
+
+$categoryQuery = mysqli_query($conn, "SELECT name FROM categories ORDER BY name ASC");
+$categories = mysqli_fetch_all($categoryQuery, MYSQLI_ASSOC);
+
+$categoryQuery1 = mysqli_query($conn, "SELECT id, name FROM categories WHERE status = 'active' ORDER BY name ASC");
+$sidebarCategories = mysqli_fetch_all($categoryQuery1, MYSQLI_ASSOC);
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -38,11 +114,13 @@ $page = 'products';
                 <label for="category">Category:</label>
                 <select id="category" name="category">
                     <option value="all">All</option>
-                    <option value="men">Men</option>
-                    <option value="women">Women</option>
-                    <option value="accessories">Accessories</option>
-                    <option value="seasonal">Seasonal</option>
+                    <?php foreach ($categories as $cat): ?>
+                        <option value="<?= urlencode($cat['name']) ?>" <?= ($category === $cat['name']) ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($cat['name']) ?>
+                        </option>
+                    <?php endforeach; ?>
                 </select>
+
             </div>
 
             <div class="filter-group">
@@ -85,10 +163,12 @@ $page = 'products';
                 <div class="filter-block">
                     <label>Category</label>
                     <ul class="filter-list">
-                        <li><input type="checkbox" id="men"> <label for="men">Men</label></li>
-                        <li><input type="checkbox" id="women"> <label for="women">Women</label></li>
-                        <li><input type="checkbox" id="accessories"> <label for="accessories">Accessories</label></li>
-                        <li><input type="checkbox" id="seasonal"> <label for="seasonal">Seasonal</label></li>
+                        <?php foreach ($sidebarCategories as $cat): ?>
+                            <li>
+                                <input type="checkbox" id="cat-<?= $cat['id'] ?>" name="category[]" value="<?= htmlspecialchars($cat['name']) ?>" <?= ($category === $cat['name']) ? 'checked' : '' ?>>
+                                <label for="cat-<?= $cat['id'] ?>"><?= htmlspecialchars($cat['name']) ?></label>
+                            </li>
+                        <?php endforeach; ?>
                     </ul>
                 </div>
 
@@ -116,49 +196,25 @@ $page = 'products';
             <!-- Product Grid -->
             <div class="product-grid-area">
                 <div class="product-grid">
-                    <?php
-                    $products = [
-                        ["id" => "1", "slug" => "boho-blouse","title" => "Boho Blouse", "price" => "Rs. 2,700", "img" => "category-women.jpg", "description" => "A breathable bohemian blouse perfect for sunny days."],
-                        ["id" => "1", "slug" => "boho-blouse","title" => "Slim Fit Shirt", "price" => "Rs. 3,950", "img" => "category-men.jpg", "description" => "A stylish slim fit shirt for a modern look."],
-                        ["id" => "1", "slug" => "boho-blouse","title" => "Leather Wallet", "price" => "Rs. 1,500", "img" => "category-accessories.jpeg", "description" => "A classic leather wallet with multiple card slots."],
-                        ["id" => "1", "slug" => "boho-blouse","title" => "Summer Dress", "price" => "Rs. 4,200", "img" => "category-seasonal.jpg", "description" => "A light and airy summer dress for casual outings."],
-                        ["id" => "1", "slug" => "boho-blouse","title" => "Knitted Sweater", "price" => "Rs. 5,200", "img" => "category-seasonal.jpg", "description" => "A breathable bohemian blouse perfect for sunny days."],
-                        ["id" => "1", "slug" => "boho-blouse","title" => "Crossbody Bag", "price" => "Rs. 3,000", "img" => "category-accessories.jpeg", "description" => "A breathable bohemian blouse perfect for sunny days."],
-                        ["id" => "1", "slug" => "boho-blouse","title" => "Floral Skirt", "price" => "Rs. 2,450", "img" => "category-women.jpg", "description" => "A breathable bohemian blouse perfect for sunny days."],
-                        ["id" => "1", "slug" => "boho-blouse","title" => "Denim Jacket", "price" => "Rs. 6,000", "img" => "category-men.jpg", "description" => "A breathable bohemian blouse perfect for sunny days."],
-                    ];
-                    foreach ($products as $p) {
-                        // Escape quotes for safety
-                        $title = htmlspecialchars($p["title"], ENT_QUOTES);
-                        $price = htmlspecialchars($p["price"], ENT_QUOTES);
-                        $img = 'inc/assets/site-images/' . $p["img"];
-                        $desc = isset($p["description"]) ? htmlspecialchars($p["description"], ENT_QUOTES) : 'No description available.';
+                    <?php foreach ($products as $p): ?>
+                        <?php $image = $p['main_image'] ?? 'inc/assets/uploads/placeholder.png'; ?>
+                        <div class="product-card">
+                            <div class="product-image">
+                               <img src="<?= str_replace('../', '', $image) ?>" alt="<?= htmlspecialchars($p['name']) ?>">
+                            </div>
+                            <div class="product-info">
+                                <h3><?= htmlspecialchars($p['name']) ?></h3>
+                                <p class="price">Rs. <?= number_format($p['price']) ?></p>
+                                <button class="quick-view-btn"
+                                    onclick="openQuickView(`<?= htmlspecialchars($p['name']) ?>`, `Rs. <?= number_format($p['price']) ?>`, `<?= str_replace('../', '', $image) ?>`, `<?= htmlspecialchars(strip_tags(substr($p['description'], 0, 100))) ?>...`, `product-details.php?id=<?= $p['id'] ?>&slug=<?= urlencode($p['slug']) ?>`)">
+                                    👁 Quick View
+                                </button>
 
-                        echo '
-                            <div class="product-card">
-                                <div class="product-image">
-                                    <img src="' . $img . '" alt="' . $title . '">
-                                </div>
-                                <div class="product-info">
-                                    <h3>' . $title . '</h3>
-                                    <p class="price">' . $price . '</p>
-                                    <a href="product-details.php?id=' . $p["id"] . '&slug='. $p["slug"] .'" class="btn small-btn primary-btn text-decoration-none view-details">View Details</a>
-                                    <button class="quick-view-btn" onclick="openQuickView(\'' . $title . '\', \'' . $price . '\', \'' . $img . '\', \'' . $desc . '\')">
-                                        👁 Quick View
-                                    </button>
-                                </div>
-                            </div>';
-                    }
-                    ?>
-                </div>
-                <div class="product-pagination">
-                    <ul class="pagination">
-                        <li><a href="#" class="page-link">« Prev</a></li>
-                        <li><a href="#" class="page-link active">1</a></li>
-                        <li><a href="#" class="page-link">2</a></li>
-                        <li><a href="#" class="page-link">3</a></li>
-                        <li><a href="#" class="page-link">Next »</a></li>
-                    </ul>
+                                <a href="product-details.php?id=<?= $p['id'] ?>&slug=<?= urlencode($p['slug']) ?>" class="btn small-btn primary-btn">View Details</a>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+
                 </div>
 
             </div>
@@ -170,7 +226,7 @@ $page = 'products';
         <div class="quick-view-content">
             <span class="close-modal" onclick="closeQuickView()">×</span>
             <div class="modal-image">
-                <img src="" alt="Product Image" id="quickViewImg">
+                <img src="<?= str_replace('../', '', $image) ?>" alt="Product Image" id="quickViewImg">
             </div>
             <div class="modal-details">
                 <h3 id="quickViewTitle">Product Title</h3>
@@ -187,6 +243,19 @@ $page = 'products';
 
     <!-- Footer -->
     <?php include 'components/footer.php'; ?>
+
+    <script>
+        document.querySelectorAll('select').forEach(el => {
+            el.addEventListener('change', () => {
+                const category = document.getElementById('category').value;
+                const sort = document.getElementById('sort').value;
+                const price = document.getElementById('price').value;
+
+                let url = `products.php?category=${category}&sort=${sort}&price=${price}`;
+                window.location.href = url;
+            });
+        });
+    </script>
 
 </body>
 

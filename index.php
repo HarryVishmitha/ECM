@@ -2,7 +2,20 @@
 // index.php
 require 'env.php';
 require_once 'core/DB_conn.php';
+session_start();
 $page = 'home';
+
+$categories = mysqli_query($conn, "SELECT name, image FROM categories WHERE status = 'active' LIMIT 4");
+$newProducts = "SELECT p.id, p.name, p.price, pi.image_path
+          FROM products p
+          LEFT JOIN product_images pi ON p.id = pi.product_id AND pi.is_primary = 1
+          WHERE p.status = 'active'
+          ORDER BY p.created_at DESC
+          LIMIT 4";
+
+$newArrivals = mysqli_query($conn, $newProducts);
+
+$shopByLook = mysqli_query($conn, "SELECT id, title, image FROM looks ORDER BY created_at DESC LIMIT 3");
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -47,32 +60,15 @@ $page = 'home';
         <div class="container">
             <h2 class="section-title text-center mb-3">Explore Our Categories</h2>
             <div class="category-grid">
-                <div class="category-box" data-animate="fade-up">
-                    <img class="op-top" src="inc/assets/site-images/category-men.jpg" alt="Men's Fashion">
-                    <div class="category-overlay">
-                        <h3>Men</h3>
-                    </div>
-                </div>
-                <div class="category-box" data-animate="fade-up">
-                    <img class="op-top" src="inc/assets/site-images/category-women.jpg" alt="Women's Fashion">
-                    <div class="category-overlay">
-                        <h3>Women</h3>
-                    </div>
-                </div>
-                <div class="category-box" data-animate="fade-up">
-                    <img src="inc/assets/site-images/category-accessories.jpeg" alt="Accessories">
-                    <div class="category-overlay">
-                        <h3>Accessories</h3>
-                    </div>
-                </div>
-                <div class="category-box" data-animate="fade-up">
-                    <img src="inc/assets/site-images/category-seasonal.jpg" alt="Seasonal">
-                    <div class="category-overlay">
-                        <h3>Seasonal Picks</h3>
-                    </div>
-                </div>
+                <?php while ($category = mysqli_fetch_assoc($categories)): ?>
+                    <a href="products.php?category=<?= urlencode($category['name']) ?>" class="category-box" data-animate="fade-up">
+                        <img class="op-top" src="<?= htmlspecialchars(str_replace('../', '', $category['image'])) ?>" alt="<?= htmlspecialchars($category['name']) ?>">
+                        <div class="category-overlay">
+                            <h3><?= htmlspecialchars($category['name']) ?></h3>
+                        </div>
+                    </a>
+                <?php endwhile; ?>
             </div>
-        </div>
     </section>
 
     <!-- New Arrivals Section -->
@@ -81,58 +77,29 @@ $page = 'home';
             <h2 class="section-title text-center mb-3">New Arrivals</h2>
 
             <div class="product-grid">
-                <div class="product-card">
-                    <div class="product-image">
-                        <img src="inc/assets/site-images/hero-img.jpg" alt="Floral Midi Dress">
+                <?php while ($product = mysqli_fetch_assoc($newArrivals)): ?>
+                    <div class="product-card">
+                        <div class="product-image">
+                            <img src="<?= htmlspecialchars(str_replace('../', '', $product['image_path'])) ?>" alt="<?= htmlspecialchars($product['name']) ?>">
+                        </div>
+                        <div class="product-info">
+                            <h3><?= htmlspecialchars($product['name']) ?></h3>
+                            <p class="price">Rs. <?= number_format($product['price'], 2) ?></p>
+                            <a href="product-details.php?id=<?= $product['id'] ?>" class="btn small-btn primary-btn text-decoration-none">View Details</a>
+                        </div>
                     </div>
-                    <div class="product-info">
-                        <h3>Floral Midi Dress</h3>
-                        <p class="price">Rs. 4,950</p>
-                        <a href="#" class="btn small-btn primary-btn text-decoration-none">View Details</a>
-                    </div>
-                </div>
-
-                <div class="product-card">
-                    <div class="product-image">
-                        <img src="inc/assets/site-images/category-seasonal.jpg" alt="Men's Oversized Shirt">
-                    </div>
-                    <div class="product-info">
-                        <h3>Men's Oversized Shirt</h3>
-                        <p class="price">Rs. 3,200</p>
-                        <a href="#" class="btn small-btn primary-btn text-decoration-none">View Details</a>
-                    </div>
-                </div>
-
-                <div class="product-card">
-                    <div class="product-image">
-                        <img src="inc/assets/site-images/category-men.jpg" alt="Streetstyle Sneakers">
-                    </div>
-                    <div class="product-info">
-                        <h3>Streetstyle Sneakers</h3>
-                        <p class="price">Rs. 7,890</p>
-                        <a href="#" class="btn small-btn primary-btn text-decoration-none">View Details</a>
-                    </div>
-                </div>
-
-                <div class="product-card">
-                    <div class="product-image">
-                        <img src="inc/assets/site-images/category-women.jpg" alt="Soft Knit Sweater">
-                    </div>
-                    <div class="product-info">
-                        <h3>Soft Knit Sweater</h3>
-                        <p class="price">Rs. 5,400</p>
-                        <a href="#" class="btn small-btn primary-btn text-decoration-none">View Details</a>
-                    </div>
-                </div>
+                <?php endwhile; ?>
             </div>
 
-            <div class="text-center mt-3">
-                <a href="#" class="btn view-all-btn">View All Products</a>
-            </div>
+        </div>
+
+        <div class="text-center mt-3 centered-btn">
+            <a href="products.php" class="btn view-all-btn">View All Products</a>
+        </div>
         </div>
     </section>
 
-    <!-- Testemonials Section -->
+    <!-- Testimonials Section -->
     <section class="testimonials mt-3 mb-3">
         <div class="container">
             <h2 class="section-title text-center mb-3">What Our Customers Say</h2>
@@ -179,29 +146,22 @@ $page = 'home';
     <section class="shop-by-look mt-3 mb-3">
         <div class="container">
             <h2 class="section-title text-center mb-3">Shop By Look</h2>
-            <div class="look-grid">
-                <div class="look-card">
-                    <img src="https://images.unsplash.com/photo-1600180758890-6f0b47c80a2a" alt="Casual Streetwear">
-                    <div class="look-info">
-                        <h4>Casual Streetwear</h4>
-                        <a href="#" class="btn small-btn primary-btn">Explore Look</a>
-                    </div>
+            <?php if (mysqli_num_rows($shopByLook) > 0): ?>
+                <div class="look-grid">
+                    <?php while ($look = mysqli_fetch_assoc($shopByLook)): ?>
+                        <div class="look-card">
+                            <img src="<?= htmlspecialchars(str_replace('../', '', $look['image'])) ?>" alt="<?= htmlspecialchars($look['title']) ?>">
+                            <div class="look-info">
+                                <h4><?= htmlspecialchars($look['title']) ?></h4>
+                                <a href="products.php?look=<?= htmlspecialchars($look['id']) ?>" class="btn small-btn primary-btn">Explore Look</a>
+                            </div>
+                        </div>
+                    <?php endwhile; ?>
                 </div>
-                <div class="look-card">
-                    <img src="https://images.unsplash.com/photo-1512436991641-6745cdb1723f" alt="Formal Elegance">
-                    <div class="look-info">
-                        <h4>Formal Elegance</h4>
-                        <a href="#" class="btn small-btn primary-btn">Explore Look</a>
-                    </div>
-                </div>
-                <div class="look-card">
-                    <img src="https://images.unsplash.com/photo-1593032465171-8bc69f53b933" alt="Boho Summer Vibes">
-                    <div class="look-info">
-                        <h4>Boho Summer Vibes</h4>
-                        <a href="#" class="btn small-btn primary-btn">Explore Look</a>
-                    </div>
-                </div>
-            </div>
+            <?php else: ?>
+                <p class="text-center">No looks available at the moment.</p>
+            <?php endif; ?>
+            
         </div>
     </section>
 

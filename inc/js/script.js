@@ -100,12 +100,13 @@ function showSlidesAuto() {
 }
 
 // quick view modal
-function openQuickView(title, price, image, description) {
+function openQuickView(title, price, img, desc, link) {
   document.getElementById("quickViewTitle").innerText = title;
   document.getElementById("quickViewPrice").innerText = price;
-  document.getElementById("quickViewImg").src = image;
-  document.getElementById("quickViewDescription").innerText = description;
-  document.getElementById("quickViewModal").style.display = "flex";
+  document.getElementById("quickViewImg").src = img;
+  document.getElementById("quickViewDescription").innerText = desc;
+  document.querySelector("#quickViewModal a").href = link;
+  document.getElementById("quickViewModal").style.display = "block";
 }
 
 function closeQuickView() {
@@ -140,7 +141,7 @@ function closeSizeGuide() {
 }
 
 function changeMainImage(thumb) {
-    const mainImage = document.getElementById('mainProductImage');
-    mainImage.src = thumb.src;
-    mainImage.alt = thumb.alt;
+  const mainImage = document.getElementById("mainProductImage");
+  mainImage.src = thumb.src;
+  mainImage.alt = thumb.alt;
 }

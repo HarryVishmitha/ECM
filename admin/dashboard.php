@@ -11,6 +11,9 @@ $productCount = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as total
 $categoryCount = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as total FROM categories"))['total'];
 $customerCount = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as total FROM users WHERE role='customer'"))['total'];
 $orderCount = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as total FROM orders"))['total'];
+$lookCount = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as total FROM looks"))['total'];
+
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -54,13 +57,20 @@ $orderCount = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as total F
                         <h3>Orders</h3>
                         <p><?= $orderCount ?></p>
                     </div>
+                    <div class="card">
+                        <h3>Shop By Look</h3>
+                        <p><?= $lookCount ?></p>
+                    </div>
+
                 </section>
 
                 <section class="quick-links">
-                    <a href="admin/products.php" class="btn">Manage Products</a>
-                    <a href="admin/orders.php" class="btn">Manage Orders</a>
-                    <a href="admin/categories.php" class="btn">Manage Categories</a>
-                    <a href="admin/customers.php" class="btn">View Customers</a>
+                    <a href="products.php" class="btn">Manage Products</a>
+                    <a href="orders.php" class="btn">Manage Orders</a>
+                    <a href="categories.php" class="btn">Manage Categories</a>
+                    <a href="customers.php" class="btn">View Customers</a>
+                    <a href="looks.php" class="btn">Manage Looks</a>
+
                 </section>
 
                 <section class="recent-orders">
