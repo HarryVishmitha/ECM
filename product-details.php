@@ -10,27 +10,30 @@ $productQuery = mysqli_query($conn, "SELECT * FROM products WHERE id = $id AND s
 $product = mysqli_fetch_assoc($productQuery);
 
 // If product exists, fetch variants and images
+$variants = [];
+$images = [];
+$totalStock = 0;
+
 if ($product) {
-    // Fetch variants
-    // $variantQuery = mysqli_query($conn, "SELECT DISTINCT size FROM product_variants WHERE product_id = $id");
-    $variants = [];
-    $variantQuery = mysqli_query($conn, "SELECT * FROM product_variants WHERE product_id = $id");
+    // Variants
+    $variantQuery = mysqli_query($conn, "SELECT id, product_id, size, color, stock, additional_price FROM product_variants WHERE product_id = $id");
     while ($row = mysqli_fetch_assoc($variantQuery)) {
-        $variants[] = $row; // id, size, color, stock, additional_price
+        $row['stock'] = (int)$row['stock'];
+        $row['additional_price'] = (float)$row['additional_price'];
+        $variants[] = $row;
+        $totalStock += $row['stock'];
     }
 
-
-    // Fetch images
-    $imageQuery = mysqli_query($conn, "SELECT image_path FROM product_images WHERE product_id = $id");
-    $images = [];
+    // Images
+    $imageQuery = mysqli_query($conn, "SELECT image_path FROM product_images WHERE product_id = $id ORDER BY is_primary DESC, id ASC");
     while ($img = mysqli_fetch_assoc($imageQuery)) {
         $images[] = $img['image_path'];
     }
 } else {
-    $sizes = [];
+    $variants = [];
     $images = [];
+    $totalStock = 0;
 }
-
 
 $newProducts = "SELECT p.id, p.name, p.price, pi.image_path
           FROM products p
@@ -41,49 +44,66 @@ $newProducts = "SELECT p.id, p.name, p.price, pi.image_path
 
 $newArrivals = mysqli_query($conn, $newProducts);
 
+// Helpers for view
+$siteName = isset($name) ? $name : 'Velvet Vogue';
+$displayTitle = $product ? $product['name'] : 'Product Not Found';
+$basePrice = $product ? (float)$product['price'] : 0.00;
+$hasStock = $totalStock > 0;
+$primaryImage = !empty($images) ? str_replace('../', '', $images[0]) : 'inc/assets/uploads/placeholder.png';
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= $product['name'] ?? 'Product Not Found' ?> – <?= $name ?></title>
+    <title><?= htmlspecialchars($displayTitle) ?> – <?= htmlspecialchars($siteName) ?></title>
     <link rel="stylesheet" href="inc/css/stylesheet.css">
     <script src="inc/js/script.js"></script>
     <link rel="icon" href="inc/assets/site-images/logo.png" type="image/x-icon">
 
     <script>
-        // Make updateColors and updatePrice available globally before DOMContentLoaded
-        const productVariants = <?= json_encode($variants) ?>;
-        let priceText, stockText, variantIdInput, submitBtn;
+        // Variants data for JS
+        const productVariants = <?= json_encode($variants, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+        const basePrice = <?= json_encode($basePrice) ?>;
 
-        function updateColors() {
-            // Ensure elements are available
-            priceText = document.getElementById('priceText');
-            stockText = document.getElementById('stockText');
-            variantIdInput = document.getElementById('variantId');
-            submitBtn = document.querySelector('.add-to-cart-btn');
+        // Cached els
+        let priceText, stockText, variantIdInput, submitBtn, sizeSel, colorSel, stockBadge;
 
-            if (!priceText || !stockText || !variantIdInput) return;
+        function setAddToCart(enabled) {
+            if (!submitBtn) submitBtn = document.querySelector('.add-to-cart-btn');
+            if (submitBtn) submitBtn.disabled = !enabled;
+        }
 
-            // reset
-            priceText.textContent = "Rs. <?= number_format($product['price'], 2) ?>";
-            stockText.textContent = "";
-            variantIdInput.value = "";
-            if (submitBtn) submitBtn.disabled = true;
+        function setStockBadge(inStock) {
+            if (!stockBadge) stockBadge = document.querySelector('.stock-badge');
+            if (!stockBadge) return;
+            stockBadge.textContent = inStock ? 'In Stock' : 'Out of Stock';
+            stockBadge.classList.toggle('out', !inStock); // style hook if you want .out { background: #f44; }
+        }
 
-            // populate colors
-            const size = document.getElementById('sizeSelect').value;
+        function resetPriceAndStock() {
+            if (!priceText) priceText = document.getElementById('priceText');
+            if (!stockText) stockText = document.getElementById('stockText');
+            if (!variantIdInput) variantIdInput = document.getElementById('variantId');
+
+            if (priceText) priceText.textContent = "Rs. " + (Number(basePrice).toFixed(2));
+            if (stockText) stockText.textContent = "";
+            if (variantIdInput) variantIdInput.value = "";
+        }
+
+        function populateColorsForSize(size) {
+            const colorSelect = document.getElementById('colorSelect');
+            if (!colorSelect) return;
+
+            colorSelect.innerHTML = '<option value="">-- Choose Color --</option>';
+
             const colors = [...new Set(
                 productVariants
                 .filter(v => v.size === size)
                 .map(v => v.color)
             )];
 
-            const colorSelect = document.getElementById('colorSelect');
-            colorSelect.innerHTML = '<option value="">-- Choose Color --</option>';
             colors.forEach(c => {
                 const opt = document.createElement('option');
                 opt.value = c;
@@ -92,75 +112,181 @@ $newArrivals = mysqli_query($conn, $newProducts);
             });
         }
 
-        function updatePrice() {
-            // Ensure elements are available
+        function updateColors() {
+            // ensure refs
             priceText = document.getElementById('priceText');
             stockText = document.getElementById('stockText');
             variantIdInput = document.getElementById('variantId');
             submitBtn = document.querySelector('.add-to-cart-btn');
+            sizeSel = document.getElementById('sizeSelect');
+            colorSel = document.getElementById('colorSelect');
+            stockBadge = document.querySelector('.stock-badge');
 
-            if (!priceText || !stockText || !variantIdInput) return;
+            resetPriceAndStock();
+            setAddToCart(false);
 
-            const size = document.getElementById('sizeSelect').value;
-            const color = document.getElementById('colorSelect').value;
-            const base = <?= $product['price'] ?>;
-            const match = productVariants.find(v => v.size === size && v.color === color);
+            const size = sizeSel.value;
+            if (!size) {
+                if (<?= $hasStock ? 'true' : 'false' ?>) {
+                    stockText.textContent = '';
+                    setStockBadge(true);
+                } else {
+                    stockText.textContent = 'Out of stock';
+                    setStockBadge(false);
+                }
+                return;
+            }
 
-            if (match) {
-                const final = base + parseFloat(match.additional_price);
-                priceText.textContent = "Rs. " + final.toFixed(2);
-                stockText.textContent = "Stock: " + match.stock;
-                variantIdInput.value = match.id;
-                if (submitBtn) submitBtn.disabled = false;
+            populateColorsForSize(size);
+
+            // If no colors exist for this size, mark as OOS
+            const sizeHasAny = productVariants.some(v => v.size === size && Number(v.stock) > 0);
+            if (!sizeHasAny) {
+                stockText.textContent = 'Out of stock';
+                setStockBadge(false);
             } else {
-                priceText.textContent = "Rs. <?= number_format($product['price'], 2) ?>";
-                stockText.textContent = "Out of stock";
-                variantIdInput.value = "";
-                if (submitBtn) submitBtn.disabled = true;
+                stockText.textContent = '';
+                setStockBadge(true);
             }
         }
-    </script>
 
+        function updatePrice() {
+            // ensure refs
+            priceText = document.getElementById('priceText');
+            stockText = document.getElementById('stockText');
+            variantIdInput = document.getElementById('variantId');
+            submitBtn = document.querySelector('.add-to-cart-btn');
+            sizeSel = document.getElementById('sizeSelect');
+            colorSel = document.getElementById('colorSelect');
+            stockBadge = document.querySelector('.stock-badge');
+
+            const size = sizeSel.value;
+            const color = colorSel.value;
+
+            // No selection yet
+            if (!size || !color) {
+                resetPriceAndStock();
+                // Global stock state
+                if (<?= $hasStock ? 'true' : 'false' ?>) {
+                    stockText.textContent = '';
+                    setStockBadge(true);
+                } else {
+                    stockText.textContent = 'Out of stock';
+                    setStockBadge(false);
+                }
+                setAddToCart(false);
+                return;
+            }
+
+            // Find variant
+            const match = productVariants.find(v => v.size === size && v.color === color);
+            if (!match) {
+                resetPriceAndStock();
+                stockText.textContent = 'Out of stock';
+                setAddToCart(false);
+                setStockBadge(false);
+                return;
+            }
+
+            const final = Number(basePrice) + Number(match.additional_price || 0);
+            priceText.textContent = "Rs. " + final.toFixed(2);
+
+            const stk = Number(match.stock || 0);
+            if (stk > 0) {
+                stockText.textContent = "Stock: " + stk;
+                variantIdInput.value = match.id;
+                setAddToCart(true);
+                setStockBadge(true);
+            } else {
+                stockText.textContent = "Out of stock";
+                variantIdInput.value = "";
+                setAddToCart(false);
+                setStockBadge(false);
+            }
+        }
+
+        // Qty controls (unchanged)
+        function adjustQty(delta) {
+            const qty = document.getElementById('qty');
+            if (!qty) return;
+            const cur = parseInt(qty.value || '1', 10);
+            const next = Math.max(1, cur + delta);
+            qty.value = next;
+        }
+
+        // Image swap
+        function changeMainImage(el) {
+            const target = document.getElementById('mainProductImage');
+            if (target && el && el.src) target.src = el.src;
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Cache refs
+            sizeSel = document.getElementById('sizeSelect');
+            colorSel = document.getElementById('colorSelect');
+            submitBtn = document.querySelector('.add-to-cart-btn');
+            stockBadge = document.querySelector('.stock-badge');
+
+            // Initial stock badge based on total stock
+            setStockBadge(<?= $hasStock ? 'true' : 'false' ?>);
+
+            // If there are no variants or no total stock, disable immediately
+            <?php if (!$hasStock || empty($variants)): ?>
+                setAddToCart(false);
+                const st = document.getElementById('stockText');
+                if (st) st.textContent = 'Out of stock';
+            <?php endif; ?>
+
+            if (sizeSel) sizeSel.addEventListener('change', updateColors);
+            if (colorSel) colorSel.addEventListener('change', updatePrice);
+        });
+
+        // Make globally available (your existing HTML calls these)
+        window.updateColors = updateColors;
+        window.updatePrice = updatePrice;
+        window.adjustQty = adjustQty;
+        window.changeMainImage = changeMainImage;
+    </script>
 </head>
 
 <body>
     <?php include 'components/topnav.php'; ?>
 
-    <section class="product-header-section">
-        <div class="container">
-            <div class="breadcrumb">
-                <a href="index.php">Home</a> &gt; <a href="products.php?page=products">Products</a> &gt; <span><?= htmlspecialchars($product['name']) ?></span>
-            </div>
-            <h1 class="product-page-title"><?= htmlspecialchars($product['name']) ?></h1>
-            <p class="product-page-subtitle">View more details of <?= htmlspecialchars($product['name']) ?></p>
-            <?php if (isset($_SESSION['error'])): ?>
-                <p class="alert alert-error"><?= $_SESSION['error'];
-                                                unset($_SESSION['error']); ?></p>
-            <?php endif; ?>
-
-        </div>
-    </section>
-
     <?php if ($product): ?>
+        <section class="product-header-section">
+            <div class="container">
+                <div class="breadcrumb">
+                    <a href="index.php">Home</a> &gt; <a href="products.php?page=products">Products</a> &gt; <span><?= htmlspecialchars($product['name']) ?></span>
+                </div>
+                <h1 class="product-page-title"><?= htmlspecialchars($product['name']) ?></h1>
+                <p class="product-page-subtitle">View more details of <?= htmlspecialchars($product['name']) ?></p>
+
+                <?php if (isset($_SESSION['error'])): ?>
+                    <p class="alert alert-error"><?= $_SESSION['error'];
+                                                    unset($_SESSION['error']); ?></p>
+                <?php endif; ?>
+            </div>
+        </section>
+
         <section class="product-details mt-4 mb-5">
             <div class="container prod-grid">
                 <div class="prod-image-box">
                     <div class="main-image">
-                        <img id="mainProductImage" src="<?= $images[0] ? str_replace('../', '', $images[0]) : 'fallback.jpg' ?>" alt="<?= htmlspecialchars($product['name']) ?>">
+                        <img id="mainProductImage" src="<?= htmlspecialchars($primaryImage) ?>" alt="<?= htmlspecialchars($product['name']) ?>">
                     </div>
                     <div class="thumbnail-gallery">
                         <?php foreach ($images as $index => $img): ?>
-                            <img src="<?= str_replace('../', '', $img) ?>" alt="thumb-<?= $index ?>" class="thumbnail" onclick="changeMainImage(this)">
+                            <img src="<?= htmlspecialchars(str_replace('../', '', $img)) ?>" alt="thumb-<?= (int)$index ?>" class="thumbnail" onclick="changeMainImage(this)">
                         <?php endforeach; ?>
-
                     </div>
                 </div>
 
                 <div class="prod-content-box">
                     <h1 class="prod-title-main"><?= htmlspecialchars($product['name']) ?></h1>
-                    <span class="stock-badge">In Stock</span>
-                    <p id="priceText" class="prod-price">Rs. <?= number_format($product['price'], 2) ?></p>
-                    <p id="stockText" class="stock-info"></p>
+                    <span class="stock-badge <?= $hasStock ? '' : 'out' ?>"><?= $hasStock ? 'In Stock' : 'Out of Stock' ?></span>
+
+                    <p id="priceText" class="prod-price">Rs. <?= number_format($basePrice, 2) ?></p>
+                    <p id="stockText" class="stock-info"><?= $hasStock ? '' : 'Out of stock' ?></p>
 
                     <p class="prod-description"><?= nl2br(htmlspecialchars($product['description'])) ?></p>
 
@@ -171,43 +297,41 @@ $newArrivals = mysqli_query($conn, $newProducts);
                     </ul>
 
                     <form class="prod-form" action="add_to_cart.php" method="post">
-                        <!-- <div class="prod-row"> -->
-                        <input type="hidden" name="product_id" value="<?= $product['id'] ?>">
+                        <input type="hidden" name="product_id" value="<?= (int)$product['id'] ?>">
                         <input type="hidden" name="variant_id" id="variantId">
+
                         <div class="prod-row">
                             <label>Select Size:</label>
-                            <select id="sizeSelect" name="size" onchange="updateColors()">
+                            <select id="sizeSelect" name="size" onchange="updateColors()" <?= (!$hasStock || empty($variants)) ? 'disabled' : '' ?>>
                                 <option value="">-- Choose Size --</option>
                                 <?php
-                                $uniqueSizes = array_unique(array_column($variants, 'size'));
+                                $uniqueSizes = array_unique(array_map(function ($v) {
+                                    return $v['size'];
+                                }, $variants));
                                 foreach ($uniqueSizes as $size):
                                 ?>
-                                    <option value="<?= $size ?>"><?= $size ?></option>
+                                    <option value="<?= htmlspecialchars($size) ?>"><?= htmlspecialchars($size) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
 
                         <div class="prod-row">
                             <label>Select Color:</label>
-                            <select id="colorSelect" name="color" onchange="updatePrice()">
+                            <select id="colorSelect" name="color" onchange="updatePrice()" <?= (!$hasStock || empty($variants)) ? 'disabled' : '' ?>>
                                 <option value="">-- Choose Color --</option>
-                                <!-- Colors will be populated via JS -->
                             </select>
                         </div>
-
-
-                        <!-- </div> -->
 
                         <div class="prod-row">
                             <label for="qty">Quantity:</label>
                             <div class="qty-group">
                                 <button type="button" onclick="adjustQty(-1)">−</button>
-                                <input type="number" id="qty" name="quantity" min="1" value="1" />
+                                <input type="number" id="qty" name="quantity" min="1" value="1" <?= $hasStock ? '' : 'disabled' ?> />
                                 <button type="button" onclick="adjustQty(1)">+</button>
                             </div>
                         </div>
 
-                        <button type="submit" class="add-to-cart-btn">Add to Cart</button>
+                        <button type="submit" class="add-to-cart-btn" <?= $hasStock ? '' : 'disabled' ?>>Add to Cart</button>
                     </form>
 
                     <div class="accordion" id="productAccordion">
@@ -240,7 +364,6 @@ $newArrivals = mysqli_query($conn, $newProducts);
                         </div>
                     </div>
 
-
                     <div class="payment-icons">
                         <div class="weAppcet be-">We accept:</div>
                         <div class="payment-logos">
@@ -249,8 +372,6 @@ $newArrivals = mysqli_query($conn, $newProducts);
                             <img src="https://upload.wikimedia.org/wikipedia/commons/b/b5/PayPal.svg" alt="PayPal">
                         </div>
                     </div>
-
-
                 </div>
             </div>
         </section>
@@ -259,16 +380,18 @@ $newArrivals = mysqli_query($conn, $newProducts);
             <div class="container">
                 <h2>Related Products</h2>
                 <div class="product-grid">
-
-                    <?php while ($product = mysqli_fetch_assoc($newArrivals)): ?>
+                    <?php while ($rp = mysqli_fetch_assoc($newArrivals)): ?>
+                        <?php
+                        $rpImg = $rp['image_path'] ? str_replace('../', '', $rp['image_path']) : 'inc/assets/uploads/placeholder.png';
+                        ?>
                         <div class="product-card">
                             <div class="product-image">
-                                <img src="<?= htmlspecialchars(str_replace('../', '', $product['image_path'])) ?>" alt="<?= htmlspecialchars($product['name']) ?>">
+                                <img src="<?= htmlspecialchars($rpImg) ?>" alt="<?= htmlspecialchars($rp['name']) ?>">
                             </div>
                             <div class="product-info">
-                                <h3><?= htmlspecialchars($product['name']) ?></h3>
-                                <p class="price">Rs. <?= number_format($product['price'], 2) ?></p>
-                                <a href="product-details.php?id=<?= $product['id'] ?>" class="btn small-btn primary-btn text-decoration-none">View Details</a>
+                                <h3><?= htmlspecialchars($rp['name']) ?></h3>
+                                <p class="price">Rs. <?= number_format((float)$rp['price'], 2) ?></p>
+                                <a href="product-details.php?id=<?= (int)$rp['id'] ?>" class="btn small-btn primary-btn text-decoration-none">View Details</a>
                             </div>
                         </div>
                     <?php endwhile; ?>
@@ -277,7 +400,11 @@ $newArrivals = mysqli_query($conn, $newProducts);
         </section>
 
     <?php else: ?>
-        <p class="container text-center">Product not found.</p>
+        <section class="product-header-section">
+            <div class="container">
+                <h1>Product not found.</h1>
+            </div>
+        </section>
     <?php endif; ?>
 
     <div id="prodSizeGuideModal" class="prod-modal-backdrop">
@@ -318,25 +445,21 @@ $newArrivals = mysqli_query($conn, $newProducts);
     </div>
 
     <?php include 'components/footer.php'; ?>
-    <script>
-       
 
+    <script>
         document.addEventListener("DOMContentLoaded", () => {
             const toggles = document.querySelectorAll(".accordion-toggle");
-
             toggles.forEach(toggle => {
                 toggle.addEventListener("click", () => {
                     const item = toggle.closest(".accordion-item");
                     const isActive = item.classList.contains("active");
 
-                    // Close all
                     document.querySelectorAll(".accordion-item").forEach(i => {
                         i.classList.remove("active");
                         i.querySelector(".accordion-toggle").setAttribute("aria-expanded", "false");
                         i.querySelector(".accordion-icon").textContent = "+";
                     });
 
-                    // Toggle clicked one
                     if (!isActive) {
                         item.classList.add("active");
                         toggle.setAttribute("aria-expanded", "true");
@@ -344,12 +467,6 @@ $newArrivals = mysqli_query($conn, $newProducts);
                     }
                 });
             });
-
-            const sizeSel = document.getElementById('sizeSelect');
-            const colorSel = document.getElementById('colorSelect');
-
-            if (sizeSel) sizeSel.addEventListener('change', updateColors);
-            if (colorSel) colorSel.addEventListener('change', updatePrice);
         });
     </script>
 </body>

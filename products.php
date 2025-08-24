@@ -1,27 +1,61 @@
 <?php
-// index.php
+// products.php
 require 'env.php';
 require_once 'core/DB_conn.php';
 
 $page = 'products';
 
+// site title fallback (in case $name isn't set in env.php)
+$siteTitle = isset($name) && $name ? $name : 'Velvet Vogue';
+
+// Read query params
 $category = isset($_GET['category']) ? trim($_GET['category']) : null;
+if ($category === 'all' || $category === '') $category = null;
+
 $lookId   = isset($_GET['look']) ? (int) $_GET['look'] : null;
 $sort     = isset($_GET['sort']) ? $_GET['sort'] : 'newest';
+$q        = isset($_GET['q']) ? trim($_GET['q']) : null;
 
-$where = "WHERE p.status = 'active'";
+// Build WHERE and params safely
+$whereParts = ["p.status = 'active'"];
 $params = [];
+$types  = "";
 
+// Category filter
 if ($category) {
-    $where .= " AND c.name = ?";
+    $whereParts[] = "c.name = ?";
     $params[] = $category;
+    $types   .= "s";
 }
 
+// Look filter
 if ($lookId) {
-    $where .= " AND p.id IN (SELECT product_id FROM look_products WHERE look_id = ?)";
+    $whereParts[] = "p.id IN (SELECT product_id FROM look_products WHERE look_id = ?)";
     $params[] = $lookId;
+    $types   .= "i";
 }
 
+// Price filter
+$priceRange = isset($_GET['price']) ? $_GET['price'] : null;
+if ($priceRange && $priceRange !== 'all') {
+    if ($priceRange === 'under-2000') {
+        $whereParts[] = "p.price < 2000";
+    } elseif ($priceRange === '2000-5000') {
+        $whereParts[] = "p.price BETWEEN 2000 AND 5000";
+    } elseif ($priceRange === 'above-5000') {
+        $whereParts[] = "p.price > 5000";
+    }
+}
+
+// Keyword search across name/description/slug/category
+if ($q) {
+    $whereParts[] = "(p.name LIKE ? OR p.description LIKE ? OR p.slug LIKE ? OR c.name LIKE ?)";
+    $like = "%{$q}%";
+    array_push($params, $like, $like, $like, $like);
+    $types .= "ssss";
+}
+
+// Sort
 switch ($sort) {
     case 'low-to-high':
         $orderBy = "ORDER BY p.price ASC";
@@ -34,27 +68,13 @@ switch ($sort) {
         break;
 }
 
-$priceRange = isset($_GET['price']) ? $_GET['price'] : null;
-if ($priceRange) {
-    switch ($priceRange) {
-        case 'under-2000':
-            $where .= " AND p.price < 2000";
-            break;
-        case '2000-5000':
-            $where .= " AND p.price BETWEEN 2000 AND 5000";
-            break;
-        case 'above-5000':
-            $where .= " AND p.price > 5000";
-            break;
-    }
-}
-
-
+$where = "WHERE " . implode(" AND ", $whereParts);
 
 $sql = "SELECT 
             p.*, 
             c.name AS category_name,
-            (SELECT image_path FROM product_images WHERE product_id = p.id AND is_primary = 1 LIMIT 1) AS main_image
+            (SELECT image_path FROM product_images 
+             WHERE product_id = p.id AND is_primary = 1 LIMIT 1) AS main_image
         FROM products p
         LEFT JOIN categories c ON p.category_id = c.id
         $where
@@ -62,9 +82,8 @@ $sql = "SELECT
 
 $stmt = mysqli_prepare($conn, $sql);
 
-// Bind parameters dynamically
+// Bind dynamically with correct types
 if (!empty($params)) {
-    $types = str_repeat("s", count($params));
     mysqli_stmt_bind_param($stmt, $types, ...$params);
 }
 
@@ -72,23 +91,24 @@ mysqli_stmt_execute($stmt);
 $result = mysqli_stmt_get_result($stmt);
 $products = mysqli_fetch_all($result, MYSQLI_ASSOC);
 
+// Topbar categories (for the select)
 $categoryQuery = mysqli_query($conn, "SELECT name FROM categories ORDER BY name ASC");
 $categories = mysqli_fetch_all($categoryQuery, MYSQLI_ASSOC);
 
+// Sidebar categories (active only)
 $categoryQuery1 = mysqli_query($conn, "SELECT id, name FROM categories WHERE status = 'active' ORDER BY name ASC");
 $sidebarCategories = mysqli_fetch_all($categoryQuery1, MYSQLI_ASSOC);
-
 ?>
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Products – <?php echo $name; ?></title>
-    <link rel="stylesheet" href="inc/css/stylesheet.css">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Products – <?php echo htmlspecialchars($siteTitle); ?></title>
+    <link rel="stylesheet" href="inc/css/stylesheet.css" />
     <script src="inc/js/script.js" defer></script>
-    <link rel="icon" href="inc/assets/site-images/logo.png" type="image/x-icon">
+    <link rel="icon" href="inc/assets/site-images/logo.png" type="image/x-icon" />
 </head>
 
 <body>
@@ -115,35 +135,34 @@ $sidebarCategories = mysqli_fetch_all($categoryQuery1, MYSQLI_ASSOC);
                 <select id="category" name="category">
                     <option value="all">All</option>
                     <?php foreach ($categories as $cat): ?>
-                        <option value="<?= urlencode($cat['name']) ?>" <?= ($category === $cat['name']) ? 'selected' : '' ?>>
+                        <?php $isSel = ($category === $cat['name']); ?>
+                        <option value="<?= urlencode($cat['name']) ?>" <?= $isSel ? 'selected' : '' ?>>
                             <?= htmlspecialchars($cat['name']) ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
-
             </div>
 
             <div class="filter-group">
                 <label for="price">Price:</label>
                 <select id="price" name="price">
-                    <option value="all">All</option>
-                    <option value="under-2000">Under Rs. 2000</option>
-                    <option value="2000-5000">Rs. 2000 - 5000</option>
-                    <option value="above-5000">Above Rs. 5000</option>
+                    <option value="all" <?= (!$priceRange || $priceRange === 'all') ? 'selected' : '' ?>>All</option>
+                    <option value="under-2000" <?= ($priceRange === 'under-2000') ? 'selected' : '' ?>>Under Rs. 2000</option>
+                    <option value="2000-5000" <?= ($priceRange === '2000-5000') ? 'selected' : '' ?>>Rs. 2000 - 5000</option>
+                    <option value="above-5000" <?= ($priceRange === 'above-5000') ? 'selected' : '' ?>>Above Rs. 5000</option>
                 </select>
             </div>
 
             <div class="filter-group">
                 <label for="sort">Sort by:</label>
                 <select id="sort" name="sort">
-                    <option value="newest">Newest</option>
-                    <option value="low-to-high">Price: Low to High</option>
-                    <option value="high-to-low">Price: High to Low</option>
+                    <option value="newest" <?= ($sort === 'newest') ? 'selected' : ''; ?>>Newest</option>
+                    <option value="low-to-high" <?= ($sort === 'low-to-high') ? 'selected' : ''; ?>>Price: Low to High</option>
+                    <option value="high-to-low" <?= ($sort === 'high-to-low') ? 'selected' : ''; ?>>Price: High to Low</option>
                 </select>
             </div>
         </div>
     </section>
-
 
     <!-- sidebar + product grid -->
     <section class="product-content-wrapper mt-3 mb-3">
@@ -156,7 +175,8 @@ $sidebarCategories = mysqli_fetch_all($categoryQuery1, MYSQLI_ASSOC);
                 <!-- Search -->
                 <div class="filter-block">
                     <label for="search">Search</label>
-                    <input type="text" id="search" name="search" placeholder="Search products...">
+                    <input type="text" id="search" name="search" placeholder="Search products..."
+                        value="<?= htmlspecialchars($q ?? '') ?>">
                 </div>
 
                 <!-- Category -->
@@ -165,8 +185,12 @@ $sidebarCategories = mysqli_fetch_all($categoryQuery1, MYSQLI_ASSOC);
                     <ul class="filter-list">
                         <?php foreach ($sidebarCategories as $cat): ?>
                             <li>
-                                <input type="checkbox" id="cat-<?= $cat['id'] ?>" name="category[]" value="<?= htmlspecialchars($cat['name']) ?>" <?= ($category === $cat['name']) ? 'checked' : '' ?>>
-                                <label for="cat-<?= $cat['id'] ?>"><?= htmlspecialchars($cat['name']) ?></label>
+                                <?php
+                                $checked = ($category === $cat['name']) ? 'checked' : '';
+                                $idAttr  = 'cat-' . (int)$cat['id'];
+                                ?>
+                                <input type="checkbox" id="<?= $idAttr ?>" name="category[]" value="<?= htmlspecialchars($cat['name']) ?>" <?= $checked ?>>
+                                <label for="<?= $idAttr ?>"><?= htmlspecialchars($cat['name']) ?></label>
                             </li>
                         <?php endforeach; ?>
                     </ul>
@@ -176,19 +200,19 @@ $sidebarCategories = mysqli_fetch_all($categoryQuery1, MYSQLI_ASSOC);
                 <div class="filter-block">
                     <label>Price Range</label>
                     <ul class="filter-list">
-                        <li><input type="radio" name="price" id="p1"> <label for="p1">Under Rs. 2000</label></li>
-                        <li><input type="radio" name="price" id="p2"> <label for="p2">Rs. 2000 - 5000</label></li>
-                        <li><input type="radio" name="price" id="p3"> <label for="p3">Above Rs. 5000</label></li>
+                        <li><input type="radio" name="priceSidebar" id="p1" <?= ($priceRange === 'under-2000') ? 'checked' : ''; ?>> <label for="p1">Under Rs. 2000</label></li>
+                        <li><input type="radio" name="priceSidebar" id="p2" <?= ($priceRange === '2000-5000') ? 'checked' : ''; ?>> <label for="p2">Rs. 2000 - 5000</label></li>
+                        <li><input type="radio" name="priceSidebar" id="p3" <?= ($priceRange === 'above-5000') ? 'checked' : ''; ?>> <label for="p3">Above Rs. 5000</label></li>
                     </ul>
                 </div>
 
-                <!-- Sort by -->
+                <!-- Sort by (sidebar) — different id to avoid duplicate) -->
                 <div class="filter-block">
-                    <label for="sort">Sort by</label>
-                    <select id="sort">
-                        <option value="newest">Newest</option>
-                        <option value="price-low">Price: Low to High</option>
-                        <option value="price-high">Price: High to Low</option>
+                    <label for="sortSidebar">Sort by</label>
+                    <select id="sortSidebar">
+                        <option value="newest" <?= ($sort === 'newest') ? 'selected' : ''; ?>>Newest</option>
+                        <option value="low-to-high" <?= ($sort === 'low-to-high') ? 'selected' : ''; ?>>Price: Low to High</option>
+                        <option value="high-to-low" <?= ($sort === 'high-to-low') ? 'selected' : ''; ?>>Price: High to Low</option>
                     </select>
                 </div>
             </aside>
@@ -197,24 +221,35 @@ $sidebarCategories = mysqli_fetch_all($categoryQuery1, MYSQLI_ASSOC);
             <div class="product-grid-area">
                 <div class="product-grid">
                     <?php foreach ($products as $p): ?>
-                        <?php $image = $p['main_image'] ?? 'inc/assets/uploads/placeholder.png'; ?>
+                        <?php $image = $p['main_image'] ?: 'inc/assets/uploads/placeholder.png'; ?>
                         <div class="product-card">
                             <div class="product-image">
-                               <img src="<?= str_replace('../', '', $image) ?>" alt="<?= htmlspecialchars($p['name']) ?>">
+                                <img src="<?= htmlspecialchars(str_replace('../', '', $image)) ?>" alt="<?= htmlspecialchars($p['name']) ?>">
                             </div>
                             <div class="product-info">
                                 <h3><?= htmlspecialchars($p['name']) ?></h3>
-                                <p class="price">Rs. <?= number_format($p['price']) ?></p>
+                                <p class="price">Rs. <?= number_format((float)$p['price']) ?></p>
                                 <button class="quick-view-btn"
-                                    onclick="openQuickView(`<?= htmlspecialchars($p['name']) ?>`, `Rs. <?= number_format($p['price']) ?>`, `<?= str_replace('../', '', $image) ?>`, `<?= htmlspecialchars(strip_tags(substr($p['description'], 0, 100))) ?>...`, `product-details.php?id=<?= $p['id'] ?>&slug=<?= urlencode($p['slug']) ?>`)">
+                                    onclick="openQuickView(
+                                        `<?= htmlspecialchars($p['name']) ?>`,
+                                        `Rs. <?= number_format((float)$p['price']) ?>`,
+                                        `<?= htmlspecialchars(str_replace('../', '', $image)) ?>`,
+                                        `<?= htmlspecialchars(strip_tags(mb_substr($p['description'] ?? '', 0, 100))) ?>...`,
+                                        `product-details.php?id=<?= (int)$p['id'] ?>&slug=<?= urlencode($p['slug']) ?>`
+                                    )">
                                     👁 Quick View
                                 </button>
 
-                                <a href="product-details.php?id=<?= $p['id'] ?>&slug=<?= urlencode($p['slug']) ?>" class="btn small-btn primary-btn">View Details</a>
+                                <a href="product-details.php?id=<?= (int)$p['id'] ?>&slug=<?= urlencode($p['slug']) ?>" class="btn small-btn primary-btn">View Details</a>
                             </div>
                         </div>
                     <?php endforeach; ?>
 
+                    <?php if (empty($products)): ?>
+                        <div class="empty-state">
+                            <p>No products found. Try adjusting your filters or search.</p>
+                        </div>
+                    <?php endif; ?>
                 </div>
 
             </div>
@@ -222,39 +257,123 @@ $sidebarCategories = mysqli_fetch_all($categoryQuery1, MYSQLI_ASSOC);
     </section>
 
     <!-- Quick View Modal -->
-    <div id="quickViewModal" class="quick-view-modal">
+    <div id="quickViewModal" class="quick-view-modal" style="display:none">
         <div class="quick-view-content">
             <span class="close-modal" onclick="closeQuickView()">×</span>
             <div class="modal-image">
-                <img src="<?= str_replace('../', '', $image) ?>" alt="Product Image" id="quickViewImg">
+                <img src="inc/assets/uploads/placeholder.png" alt="Product Image" id="quickViewImg">
             </div>
             <div class="modal-details">
                 <h3 id="quickViewTitle">Product Title</h3>
                 <p id="quickViewPrice">Rs. 0.00</p>
                 <p id="quickViewDescription">A short description of the product goes here.</p>
-                <a href="#" class="btn small-btn primary-btn">View Full Details</a>
+                <a id="quickViewLink" href="#" class="btn small-btn primary-btn">View Full Details</a>
             </div>
         </div>
     </div>
-
-
-
-
 
     <!-- Footer -->
     <?php include 'components/footer.php'; ?>
 
     <script>
-        document.querySelectorAll('select').forEach(el => {
-            el.addEventListener('change', () => {
-                const category = document.getElementById('category').value;
-                const sort = document.getElementById('sort').value;
-                const price = document.getElementById('price').value;
+        (function() {
+            // Controls (top bar)
+            const catSel = document.getElementById('category');
+            const priceSel = document.getElementById('price');
+            const sortSel = document.getElementById('sort');
 
-                let url = `products.php?category=${category}&sort=${sort}&price=${price}`;
-                window.location.href = url;
+            // Sidebar mirrors
+            const sortSidebar = document.getElementById('sortSidebar');
+            const sidebarPriceUnder = document.getElementById('p1');
+            const sidebarPriceMid = document.getElementById('p2');
+            const sidebarPriceAbove = document.getElementById('p3');
+
+            // Search input
+            const searchI = document.getElementById('search');
+
+            // Build URL from current UI state
+            function buildUrl(overrides = {}) {
+                const category = overrides.category ?? (catSel?.value ?? 'all');
+                const sort = overrides.sort ?? (sortSel?.value ?? 'newest');
+                const price = overrides.price ?? (priceSel?.value ?? 'all');
+                const qRaw = overrides.q ?? (searchI?.value || '');
+                const q = qRaw.trim();
+
+                const params = new URLSearchParams();
+                params.set('category', category);
+                params.set('sort', sort);
+                params.set('price', price);
+                if (q) params.set('q', q);
+
+                return `products.php?${params.toString()}`;
+            }
+
+            function go(overrides = {}) {
+                window.location.href = buildUrl(overrides);
+            }
+
+            // Top select changes
+            [catSel, priceSel, sortSel].forEach(el => {
+                if (!el) return;
+                el.addEventListener('change', () => go());
             });
-        });
+
+            // Sidebar "Sort by" mirrors top sort
+            if (sortSidebar) {
+                sortSidebar.addEventListener('change', () => {
+                    if (sortSel) sortSel.value = sortSidebar.value;
+                    go();
+                });
+            }
+
+            // Sidebar price radios mirror top price
+            function sidebarToTopPrice(val) {
+                if (!priceSel) return;
+                priceSel.value = val;
+                go();
+            }
+            if (sidebarPriceUnder) sidebarPriceUnder.addEventListener('change', () => sidebarToTopPrice('under-2000'));
+            if (sidebarPriceMid) sidebarPriceMid.addEventListener('change', () => sidebarToTopPrice('2000-5000'));
+            if (sidebarPriceAbove) sidebarPriceAbove.addEventListener('change', () => sidebarToTopPrice('above-5000'));
+
+            // Enter to search + debounce
+            if (searchI) {
+                searchI.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        go();
+                    }
+                });
+                let t = null;
+                searchI.addEventListener('input', () => {
+                    clearTimeout(t);
+                    t = setTimeout(() => {
+                        const val = searchI.value.trim();
+                        if (val.length >= 2 || val.length === 0) go();
+                    }, 400);
+                });
+            }
+
+            // Quick View fallback (in case not defined in script.js)
+            if (typeof window.openQuickView !== 'function') {
+                window.openQuickView = function(title, price, img, desc, link) {
+                    const modal = document.getElementById('quickViewModal');
+                    document.getElementById('quickViewTitle').textContent = title || 'Product';
+                    document.getElementById('quickViewPrice').textContent = price || '';
+                    document.getElementById('quickViewDescription').textContent = desc || '';
+                    document.getElementById('quickViewImg').src = img || 'inc/assets/uploads/placeholder.png';
+                    const a = document.getElementById('quickViewLink');
+                    a.href = link || '#';
+                    modal.style.display = 'block';
+                };
+            }
+            if (typeof window.closeQuickView !== 'function') {
+                window.closeQuickView = function() {
+                    const modal = document.getElementById('quickViewModal');
+                    modal.style.display = 'none';
+                };
+            }
+        })();
     </script>
 
 </body>

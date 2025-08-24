@@ -2233,3 +2233,33 @@ body.scrolled .topNav-wrapper {
   font-weight: 500;
   text-align: center;
 }
+
+/* Base badge style */
+.stock-badge {
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: #fff;
+  background-color: #28a745; /* default = In Stock (green) */
+  transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+/* Hover effect */
+.stock-badge:hover {
+  transform: scale(1.05);
+}
+
+/* Out of Stock modifier */
+.stock-badge.out {
+  background-color: #dc3545; /* red */
+  color: #fff;
+}
+
+/* Optional: add shadow for better visibility */
+.stock-badge,
+.stock-badge.out {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}

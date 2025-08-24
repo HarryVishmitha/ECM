@@ -24,10 +24,26 @@
          <div class="footer-social">
              <h4>Follow Us</h4>
              <div class="social-icons">
-                 <a href="#"><img src="inc/assets/site-images/facebook.svg" alt="Facebook"></a>
-                 <a href="#"><img src="inc/assets/site-images/instagram.svg" alt="Instagram"></a>
-                 <a href="#"><img src="inc/assets/site-images/twitter.svg" alt="Twitter"></a>
-                 <a href="#"><img src="inc/assets/site-images/pinterest.svg" alt="Pinterest"></a>
+                 <!-- Facebook -->
+                 <a href="https://www.facebook.com/" target="_blank" rel="noopener noreferrer">
+                     <img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/facebook.svg" alt="Facebook" width="30" height="30">
+                 </a>
+
+                 <!-- Instagram -->
+                 <a href="https://www.instagram.com/" target="_blank" rel="noopener noreferrer">
+                     <img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/instagram.svg" alt="Instagram" width="30" height="30">
+                 </a>
+
+                 <!-- Twitter (X) -->
+                 <a href="https://twitter.com/" target="_blank" rel="noopener noreferrer">
+                     <img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/x.svg" alt="Twitter/X" width="30" height="30">
+                 </a>
+
+                 <!-- Pinterest -->
+                 <a href="https://www.pinterest.com/" target="_blank" rel="noopener noreferrer">
+                     <img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/pinterest.svg" alt="Pinterest" width="30" height="30">
+                 </a>
+
              </div>
          </div>
      </div>

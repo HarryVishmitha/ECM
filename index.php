@@ -24,6 +24,8 @@ $shopByLook = mysqli_query($conn, "SELECT id, title, image FROM looks ORDER BY c
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Home – <?php echo $name; ?></title>
+    <meta name="description" content="Discover Velvet Vogue – your destination for trendy casual and elegant formal wear. Shop the latest fashion collections with fast delivery and secure checkout.">
+    <meta name="keywords" content="Velvet Vogue, trendy clothing, casual wear, formal wear, fashion Sri Lanka, online clothing store, stylish outfits, young adults fashion">
     <link rel="stylesheet" href="inc/css/stylesheet.css">
     <script src="inc/js/script.js" defer></script>
     <link rel="icon" href="inc/assets/site-images/logo.png" type="image/x-icon">
@@ -161,7 +163,7 @@ $shopByLook = mysqli_query($conn, "SELECT id, title, image FROM looks ORDER BY c
             <?php else: ?>
                 <p class="text-center">No looks available at the moment.</p>
             <?php endif; ?>
-            
+
         </div>
     </section>
 
